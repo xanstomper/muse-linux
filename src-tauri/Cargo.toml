@@ -4,13 +4,25 @@ version = "0.1.0"
 description = "Native Linux client for Meta Muse"
 edition = "2021"
 
+[lib]
+name = "muse_linux_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "test"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+notify-rust = "4"
+arboard = "3"
+walkdir = "2"
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
 
 [profile.release]
 strip = true

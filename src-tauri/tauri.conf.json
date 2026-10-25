@@ -7,17 +7,7 @@
     "frontendDist": "../ui"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Muse",
-        "width": 1200,
-        "height": 860,
-        "minWidth": 480,
-        "minHeight": 600,
-        "url": "https://muse.ai/",
-        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 MuseLinux/0.1"
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }

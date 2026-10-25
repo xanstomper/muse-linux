@@ -1,17 +1,35 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(test, allow(dead_code))]
 
+use muse_linux_lib::tools;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     Manager, WindowEvent,
 };
 
-const MUSE_URL: &str = "https://muse.ai/";
+const BRIDGE_JS: &str = include_str!("../../ui/native-bridge.js");
 
-fn main() {
+fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            // Tray: Muse toggle + quit
+            // Main window is defined in code (not config) so we can attach
+            // the native-bridge init script + devtools.
+            tauri::WebviewWindowBuilder::new(
+                app,
+                "main",
+                tauri::WebviewUrl::External("https://muse.ai/".parse().expect("url")),
+            )
+            .title("Muse")
+            .inner_size(1200.0, 860.0)
+            .min_inner_size(480.0, 600.0)
+            .initialization_script(BRIDGE_JS)
+            .devtools(true)
+            .build()
+            .expect("main window");
+
             let toggle = MenuItem::with_id(app, "toggle", "Show/Hide Muse", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&toggle, &quit])?;
@@ -35,8 +53,21 @@ fn main() {
                 .build(app)?;
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            tools::sys_exec,
+            tools::fs_list,
+            tools::fs_read,
+            tools::fs_write,
+            tools::fs_search,
+            tools::procs,
+            tools::sys_kill,
+            tools::open_path,
+            tools::notify,
+            tools::push_to_muse,
+            tools::set_yolo,
+            tools::audit_tail,
+        ])
         .on_window_event(|window, event| {
-            // Close-to-tray like the Mac app
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let _ = window.hide();
                 api.prevent_close();
@@ -46,6 +77,6 @@ fn main() {
         .expect("error while running Muse Linux");
 }
 
-pub fn muse_url() -> &'static str {
-    MUSE_URL
+fn main() {
+    run();
 }
