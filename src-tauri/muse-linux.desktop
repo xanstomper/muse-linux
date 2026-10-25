@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Muse
+Comment=Meta Muse personal AI agent — native Linux client
+Exec=muse-linux
+Icon=muse-linux
+Categories=Network;Utility;
+Terminal=false
