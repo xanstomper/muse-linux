@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![cfg_attr(test, allow(dead_code))]
 
-use muse_linux_lib::tools;
+use muse_linux_lib::{agent, tools};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -66,6 +66,10 @@ fn run() {
             tools::push_to_muse,
             tools::set_yolo,
             tools::audit_tail,
+            agent::term_exec,
+            agent::term_reset,
+            agent::git_status,
+            agent::apply_patch,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -78,5 +82,10 @@ fn run() {
 }
 
 fn main() {
+    // Alder Lake-N iGPU: WebKit's DMA-buf renderer idles at ~46% CPU and
+    // janks scrolling. Measured 2026-10-25: compositing-off = smoothest
+    // scroll (311 jiffies vs 365) with 2% idle. Must be set pre-launch.
+    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     run();
 }

@@ -16,7 +16,7 @@ fn audit_dir() -> PathBuf {
     d
 }
 
-fn audit(action: &str, detail: &str) {
+pub fn audit(action: &str, detail: &str) {
     let line = format!(
         "{{\"ts\":\"{}\",\"action\":\"{}\",\"detail\":{}}}\n",
         chrono_now(),
