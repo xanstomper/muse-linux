@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-set-yolo"
+description = "Allows set_yolo"
+commands.allow = ["set_yolo"]

@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-audit-tail"
+description = "Allows audit_tail"
+commands.allow = ["audit_tail"]

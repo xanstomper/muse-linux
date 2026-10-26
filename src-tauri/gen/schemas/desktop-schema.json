@@ -387,6 +387,12 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Allows audit_tail",
+          "type": "string",
+          "const": "allow-audit-tail",
+          "markdownDescription": "Allows audit_tail"
+        },
+        {
           "description": "Allows daemon_connect",
           "type": "string",
           "const": "allow-daemon-connect",
@@ -427,6 +433,12 @@
           "type": "string",
           "const": "allow-daemon-status",
           "markdownDescription": "Allows daemon_status"
+        },
+        {
+          "description": "Allows set_yolo",
+          "type": "string",
+          "const": "allow-set-yolo",
+          "markdownDescription": "Allows set_yolo"
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

@@ -344,23 +344,9 @@
       /* never let the connect UI break the host page */
     }
   }
-  async function updateBadgeInner() {
-    ensureDom();
-    let badge = document.getElementById("muse-dev-badge");
-    if (!badge) {
-      badge = document.createElement("button");
-      badge.id = "muse-dev-badge";
-      badge.className = "muc-badge";
-      badge.addEventListener("click", open);
-      // attach OUTSIDE the app's React root (body) so SPA reconciliation never
-      // sees our nodes — this was crashing muse.ai to a white screen
-      (document.documentElement || document.body).appendChild(badge);
-    }
-    let s = {};
-    try { s = await invoke("daemon_status"); } catch {}
-    badge.innerHTML = `<span class="dot" style="background:${s.reachable ? "#3ecf6f" : s.paired ? "#ffb44d" : "#5b6272"}"></span>` +
-      (s.paired ? (s.reachable ? "Device connected" : "Device offline") : "Connect device");
-  }
+  // Badge removed: it covered muse.ai's own UI. Device status lives in
+  // Settings (Ctrl+,) → Device — see ui/settings.js.
+  async function updateBadgeInner() {}
 
   window.addEventListener("keydown", (e) => {
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") {

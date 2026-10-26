@@ -16,6 +16,7 @@ const DESKTOP_JS: &str = include_str!("../../ui/desktop.js");
 
 /// Device connect panel (pair a muse-daemon endpoint from the UI).
 const CONNECT_JS: &str = include_str!("../../ui/connect.js");
+const SETTINGS_JS: &str = include_str!("../../ui/settings.js");
 
 fn window_state_path(app: &tauri::AppHandle) -> std::path::PathBuf {
     app.path()
@@ -61,6 +62,7 @@ fn run() {
             .initialization_script(BRIDGE_JS)
             .initialization_script(DESKTOP_JS)
             .initialization_script(CONNECT_JS)
+            .initialization_script(SETTINGS_JS)
             .initialization_script(&format!(
                 "document.addEventListener('DOMContentLoaded',function(){{var s=document.createElement('style');s.id='muse-desktop-css';s.textContent={};document.head.appendChild(s);}});",
                 serde_json::to_string(DESKTOP_CSS).expect("css json")
