@@ -15,7 +15,7 @@ if command -v cargo >/dev/null 2>&1; then
   TMP="$(mktemp -d)"
   git clone --depth 1 "$REPO" "$TMP/muse-linux"
   (cd "$TMP/muse-linux/daemon" && cargo build --release)
-  BIN="$TMP/muse-linux/daemon/target/release/muse-daemon"
+  BIN="$TMP/muse-linux/target/release/muse-daemon"
   INSTALL_TMP="$(mktemp -d)"
   cp "$BIN" "$INSTALL_TMP/muse-daemon"
   BIN="$INSTALL_TMP/muse-daemon"
