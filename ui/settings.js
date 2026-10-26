@@ -221,6 +221,52 @@
     if (e.key === "Escape" && els?.root.classList.contains("open")) close();
   });
 
+  // ---- Baked-in integration: inject "Muse Desktop" into muse.ai's own settings menu ----
+  // When any popover/menu containing a Settings entry opens, append a row that matches its
+  // style and opens our panel.
+  function wireMenuIntegration() {
+    if (wireMenuIntegration.done) return;
+    wireMenuIntegration.done = true;
+    const obs = new MutationObserver(() => {
+      if (!document.body) return;
+      // muse.ai uses [role=menu]/[data-slot=popover-content]/div overlays
+      const menus = document.querySelectorAll(
+        '[role="menu"], [data-slot="popover-content"], [data-radix-popper-content-wrapper]'
+      );
+      menus.forEach((menu) => {
+        if (menu.querySelector("#mus-menu-item") || menu.dataset.musWired) return;
+        const items = [...menu.querySelectorAll('[role^="menuitem"], button, a')];
+        const anchor = items.find((el) =>
+          /settings|preferences/i.test(el.textContent || el.getAttribute("aria-label") || ""));
+        if (!anchor) return;
+        menu.dataset.musWired = "1";
+        const row = anchor.cloneNode(true);
+        row.id = "mus-menu-item";
+        row.removeAttribute("href");
+        row.setAttribute("aria-label", "Muse Desktop settings");
+        // swap label text
+        const label = row.querySelector("span:not(:has(svg))") || row;
+        const txtNode = [...row.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+        if (txtNode) txtNode.textContent = "Muse Desktop settings";
+        else if (label && label.textContent.trim()) label.textContent = "Muse Desktop settings";
+        row.addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          open();
+          // close their menu
+          document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        });
+        anchor.parentElement.insertBefore(row, anchor.nextSibling);
+      });
+    });
+    obs.observe(document.documentElement, { childList: true, subtree: true });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wireMenuIntegration);
+  } else {
+    wireMenuIntegration();
+  }
+
   window.__museSettings = { open, close, refresh };
-  console.info("[MuseLinux] settings panel ready (Ctrl+, or bottom-right gear)");
+  console.info("[MuseLinux] settings panel ready (Ctrl+, gear, and baked into muse.ai settings menu)");
 })();
