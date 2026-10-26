@@ -1,0 +1,13 @@
+#!/bin/bash
+# Muse Linux launcher — prefers installed deb binary, falls back to AppImage
+APPIMAGE="$HOME/Applications/Muse-0.1.0-x86_64.AppImage"
+[ -f "$APPIMAGE" ] || APPIMAGE="/opt/muse/Muse-0.1.0-x86_64.AppImage"
+if command -v muse-linux >/dev/null 2>&1; then
+    exec muse-linux "$@"
+elif [ -f "$APPIMAGE" ]; then
+    export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1
+    exec "$APPIMAGE" "$@"
+else
+    echo "Muse not found — install: sudo dpkg -i Muse_0.1.0_amd64.deb  (or place AppImage in ~/Applications)" >&2
+    exit 1
+fi
