@@ -242,6 +242,7 @@
   function wireMenuIntegration() {
     if (wireMenuIntegration.done) return;
     wireMenuIntegration.done = true;
+    let lastTabScan = 0;
     const obs = new MutationObserver(() => {
       if (!document.body) return;
       // muse.ai uses [role=menu]/[data-slot=popover-content]/div overlays
@@ -279,6 +280,33 @@
         });
         anchor.parentElement.insertBefore(row, anchor.nextSibling);
       });
+      // settings PAGE/TAB: the sidebar lists sections (General, ...). Insert a
+      // "Linux" nav item directly ABOVE "General" — that's where users look.
+      const now = Date.now();
+      if (now - lastTabScan < 800) return;
+      lastTabScan = now;
+      const navItems = document.querySelectorAll('button, a, [role="tab"], [role="menuitem"], li');
+      const gen = [...navItems].find((el) => {
+        if (el.dataset.musLinuxDone || el.id === "mus-linux-tab") return false;
+        if (el.querySelector("#mus-linux-tab")) return false;
+        const t = (el.textContent || "").trim().toLowerCase();
+        return t === "general";
+      });
+      if (!gen) return;
+      gen.dataset.musLinuxDone = "1";
+      const row = gen.cloneNode(true);
+      row.id = "mus-linux-tab";
+      row.removeAttribute("href");
+      row.setAttribute("aria-label", "Linux");
+      const walk = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+      while (walk.nextNode()) walk.currentNode.textContent = "";
+      const first = row.querySelector("span,div,p") || row;
+      first.textContent = "Linux";
+      row.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        open();
+      });
+      gen.parentElement.insertBefore(row, gen);
     });
     obs.observe(document.documentElement, { childList: true, subtree: true });
   }
