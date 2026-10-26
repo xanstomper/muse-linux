@@ -2,7 +2,7 @@
 Type=Application
 Name=Muse
 Comment=Meta Muse personal AI agent — native Linux client
-Exec=muse-linux
+Exec=/usr/local/bin/muse
 Icon=muse-linux
 Categories=Network;Utility;
 Terminal=false
