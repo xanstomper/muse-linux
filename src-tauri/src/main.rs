@@ -4,11 +4,44 @@
 use muse_linux_lib::{agent, daemon, tools};
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::TrayIconBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WindowEvent,
 };
 
 const BRIDGE_JS: &str = include_str!("../../ui/native-bridge.js");
+
+/// Injected on every page load: desktop UX fixes for muse.ai.
+const DESKTOP_CSS: &str = include_str!("../../ui/desktop.css");
+const DESKTOP_JS: &str = include_str!("../../ui/desktop.js");
+
+/// Device connect panel (pair a muse-daemon endpoint from the UI).
+const CONNECT_JS: &str = include_str!("../../ui/connect.js");
+
+fn window_state_path(app: &tauri::AppHandle) -> std::path::PathBuf {
+    app.path()
+        .app_config_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("/tmp"))
+        .join("window-state.txt")
+}
+
+fn read_window_state(
+    p: &std::path::Path,
+) -> Result<Option<(i32, i32, u32, u32, bool)>, Box<dyn std::error::Error>> {
+    let Ok(txt) = std::fs::read_to_string(p) else {
+        return Ok(None);
+    };
+    let parts: Vec<&str> = txt.split_whitespace().collect();
+    if parts.len() != 5 {
+        return Ok(None);
+    }
+    Ok(Some((
+        parts[0].parse()?,
+        parts[1].parse()?,
+        parts[2].parse()?,
+        parts[3].parse()?,
+        parts[4] == "max",
+    )))
+}
 
 fn run() {
     tauri::Builder::default()
@@ -26,6 +59,24 @@ fn run() {
             .inner_size(1200.0, 860.0)
             .min_inner_size(480.0, 600.0)
             .initialization_script(BRIDGE_JS)
+            .initialization_script(DESKTOP_JS)
+            .initialization_script(CONNECT_JS)
+            .initialization_script(&format!(
+                "document.addEventListener('DOMContentLoaded',function(){{var s=document.createElement('style');s.id='muse-desktop-css';s.textContent={};document.head.appendChild(s);}});",
+                serde_json::to_string(DESKTOP_CSS).expect("css json")
+            ))
+            .on_navigation(|url| {
+                // External links leave the app via xdg-open; only muse.ai stays.
+                let host = url.host_str().unwrap_or("");
+                if host == "muse.ai" || host == "accounts.muse.ai" || host.is_empty() {
+                    true
+                } else {
+                    let _ = std::process::Command::new("xdg-open")
+                        .arg(url.as_str())
+                        .spawn();
+                    false
+                }
+            })
             .devtools(true)
             .build()
             .expect("main window");
@@ -35,7 +86,7 @@ fn run() {
             let menu = Menu::with_items(app, &[&toggle, &quit])?;
             // real Meta Muse mark (muse.ai official brand asset)
             let icon = app.default_window_icon().cloned().expect("bundle icon");
-            TrayIconBuilder::new()
+            let tray = TrayIconBuilder::new()
                 .icon(icon)
                 .menu(&menu)
                 .tooltip("Muse")
@@ -53,7 +104,123 @@ fn run() {
                     "quit" => app.exit(0),
                     _ => {}
                 })
+                // left-click on tray icon: restore/focus the window
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
+                        }
+                    }
+                })
                 .build(app)?;
+            let _ = tray;
+
+            // Native Edit/View menus: clipboard + zoom + find (n4/n5)
+            use tauri::menu::{CheckMenuItem, PredefinedMenuItem, Submenu};
+            let window = app.get_webview_window("main").expect("main window");
+
+            let file_menu = Submenu::with_id(app, "file", "File", true)?;
+            file_menu.append(&MenuItem::with_id(app, "new_chat", "New Chat\tCtrl+L", true, None::<&str>)?)?;
+            file_menu.append(&MenuItem::with_id(app, "connect_device", "Connect Device…\tCtrl+Shift+D", true, None::<&str>)?)?;
+            file_menu.append(&PredefinedMenuItem::separator(app)?)?;
+            file_menu.append(&MenuItem::with_id(app, "quit2", "Quit\tCtrl+Q", true, None::<&str>)?)?;
+
+            let edit_menu = Submenu::with_id(app, "edit", "Edit", true)?;
+            edit_menu.append(&PredefinedMenuItem::undo(app, None)?)?;
+            edit_menu.append(&PredefinedMenuItem::redo(app, None)?)?;
+            edit_menu.append(&PredefinedMenuItem::separator(app)?)?;
+            edit_menu.append(&PredefinedMenuItem::cut(app, None)?)?;
+            edit_menu.append(&PredefinedMenuItem::copy(app, None)?)?;
+            edit_menu.append(&PredefinedMenuItem::paste(app, None)?)?;
+            edit_menu.append(&PredefinedMenuItem::select_all(app, None)?)?;
+            edit_menu.append(&PredefinedMenuItem::separator(app)?)?;
+            edit_menu.append(&MenuItem::with_id(app, "find", "Find\tCtrl+F", true, None::<&str>)?)?;
+
+            let view_menu = Submenu::with_id(app, "view", "View", true)?;
+            view_menu.append(&MenuItem::with_id(app, "zoom_in", "Zoom In\tCtrl+=", true, None::<&str>)?)?;
+            view_menu.append(&MenuItem::with_id(app, "zoom_out", "Zoom Out\tCtrl+-", true, None::<&str>)?)?;
+            view_menu.append(&MenuItem::with_id(app, "zoom_reset", "Actual Size\tCtrl+0", true, None::<&str>)?)?;
+            view_menu.append(&PredefinedMenuItem::separator(app)?)?;
+            view_menu.append(&MenuItem::with_id(app, "reload", "Reload	Ctrl+R", true, None::<&str>)?)?;
+
+            let menubar = Menu::new(app)?;
+            menubar.append(&file_menu)?;
+            menubar.append(&edit_menu)?;
+            menubar.append(&view_menu)?;
+            window.set_menu(menubar)?;
+
+            // n6: restore persisted window state
+            let state_path = window_state_path(app.handle());
+            if let Ok(Some((x, y, wdt, hgt, max))) = read_window_state(&state_path) {
+                if max {
+                    let _ = window.maximize();
+                } else {
+                    let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+                    let _ = window.set_size(tauri::PhysicalSize::new(wdt, hgt));
+                }
+            }
+            // n6: persist on change
+            let sp = state_path.clone();
+            let last = std::cell::RefCell::new((0i32, 0i32, 0u32, 0u32));
+            window.on_window_event(move |event| {
+                // Moved gives position-only, Resized size-only; merge them.
+                {
+                    let mut st = last.borrow_mut();
+                    if let WindowEvent::Moved(p) = event {
+                        st.0 = p.x;
+                        st.1 = p.y;
+                    }
+                    if let WindowEvent::Resized(sz) = event {
+                        st.2 = sz.width;
+                        st.3 = sz.height;
+                    }
+                    if st.2 > 0 {
+                        let _ = std::fs::create_dir_all(sp.parent().expect("cfg dir"));
+                        let _ = std::fs::write(
+                            &sp,
+                            format!("{} {} {} {}", st.0, st.1, st.2, st.3),
+                        );
+                    }
+                }
+            });
+
+            app.on_menu_event(move |app_handle, event| {
+                let Some(w) = app_handle.get_webview_window("main") else { return };
+                match event.id().as_ref() {
+                    "new_chat" => {
+                        let _ = w.eval("window.__museDesktop?.newChat?.() || location.reload()");
+                    }
+                    "connect_device" => {
+                        let _ = w.eval("window.__museConnect?.open?.()");
+                    }
+                    "quit2" => app_handle.exit(0),
+                    "find" => {
+                        let _ = w.eval("window.__museDesktop?.find?.()");
+                    }
+                    "zoom_in" => {
+                        let _ = w.eval("window.__museDesktop?.zoom(0.1)");
+                    }
+                    "zoom_out" => {
+                        let _ = w.eval("window.__museDesktop?.zoom(-0.1)");
+                    }
+                    "zoom_reset" => {
+                        let _ = w.eval("window.__museDesktop?.zoom(null)");
+                    }
+                    "reload" => {
+                        let _ = w.eval("location.reload()");
+                    }
+                    _ => {}
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -75,6 +242,10 @@ fn run() {
             agent::apply_patch,
             daemon::daemon_call,
             daemon::daemon_status,
+            daemon::daemon_probe,
+            daemon::daemon_connect,
+            daemon::daemon_disconnect,
+            daemon::daemon_get_connection,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

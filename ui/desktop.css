@@ -1,0 +1,51 @@
+/* Muse Linux — desktop UX polish, injected on every muse.ai page load.
+   Removes mobile/landing cruft, restores desktop text behavior. */
+
+/* n2: this is a desktop app — text is selectable and copyable everywhere,
+   except where the page really needs to own it (its own buttons/inputs). */
+* {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+button, [role="button"], input, textarea, [contenteditable] {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
+
+/* n1: hide mobile hamburger / sticky bars / app banners / cookie spam.
+   Selector list is best-effort against muse.ai's DOM; harmless if absent. */
+[aria-label="Download apps"],
+[class*="mobile-nav"], [class*="mobileNav"],
+[class*="sticky-bottom"], [class*="stickyBottom"],
+[class*="app-banner"], [class*="appBanner"],
+[class*="cookie"], [id*="cookie"],
+[class*="get-the-app"], [class*="getTheApp"] {
+  display: none !important;
+}
+
+/* n1: hide the landing hero when already logged in — muse.ai shows a full
+   marketing page behind the login form inside the webview. */
+form ~ article, form ~ section { display: none !important; }
+
+/* Focus rings: WebKitGTK's default is invisible; make focus obvious. */
+:focus-visible { outline: 2px solid #0082fb !important; outline-offset: 1px; }
+
+/* Kill the double-scrollbar effect inside chat scrollers. */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,.45); border-radius: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* n7: offline screen (page is replaced by JS on nav failure) */
+#muse-offline {
+  position: fixed; inset: 0; z-index: 999999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; background: #0f1117; color: #e8eaf0;
+  font-family: system-ui, sans-serif;
+}
+#muse-offline h1 { font-size: 22px; margin: 0; }
+#muse-offline p { color: #9aa1b0; margin: 0; }
+#muse-offline button {
+  margin-top: 8px; padding: 8px 22px; border: 0; border-radius: 8px;
+  background: #0082fb; color: #fff; font-size: 15px; cursor: pointer;
+}

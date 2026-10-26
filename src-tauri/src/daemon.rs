@@ -46,7 +46,7 @@ fn http_post(url: &str, path: &str, body: &str, token: Option<&str>) -> Result<S
         .set_read_timeout(Some(Duration::from_secs(90)))
         .map_err(|e| e.to_string())?;
     let auth = token
-        .map(|t| format!("Authorization: Bearer {t}\r\n"))
+        .map(|t| format!("Authorization: Bearer {t}"))
         .unwrap_or_default();
     let req = format!(
         "POST {path} HTTP/1.1\r\nHost: {hostport}\r\nContent-Type: application/json\r\n{auth}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
@@ -69,8 +69,16 @@ fn http_post(url: &str, path: &str, body: &str, token: Option<&str>) -> Result<S
 /// Forward one tool call to the daemon. Returns the tool result, or the
 /// daemon's error message (denied/blocked/timeout) as Err.
 pub fn call_tool(tool: &str, arguments: &Value) -> Result<Value, String> {
-    let token = read_token()
-        .ok_or_else(|| "no daemon token — is muse-daemon installed? (systemctl --user start muse-daemon)".to_string())?;
+    // saved connection (from the UI connect panel) wins over env/default
+    let (url, token) = match load_connection() {
+        Some(c) => (c.url, c.token),
+        None => (
+            daemon_url(),
+            read_token().ok_or_else(|| {
+                "no paired device — open Settings → Devices and connect one".to_string()
+            })?,
+        ),
+    };
     let id = format!(
         "app-{}",
         std::time::SystemTime::now()
@@ -79,7 +87,7 @@ pub fn call_tool(tool: &str, arguments: &Value) -> Result<Value, String> {
             .as_nanos()
     );
     let body = serde_json::json!({"id": id, "tool": tool, "arguments": arguments}).to_string();
-    let resp = http_post(&daemon_url(), "/call", &body, Some(&token))?;
+    let resp = http_post(&url, "/call", &body, Some(&token))?;
     let reply: DaemonReply =
         serde_json::from_str(&resp).map_err(|e| format!("daemon reply: {e} ({resp})"))?;
     if reply.ok {
@@ -101,16 +109,127 @@ pub fn daemon_call(tool: String, arguments: Value) -> Result<Value, String> {
 /// Health probe for the UI status chip.
 #[tauri::command]
 pub fn daemon_status() -> Value {
-    let health = http_post(&daemon_url(), "/health", "", None)
+    let conn = load_connection();
+    let url = conn.as_ref().map(|c| c.url.clone()).unwrap_or_else(daemon_url);
+    let health = http_post(&url, "/health", "", None)
         .ok()
         .and_then(|b| serde_json::from_str::<Value>(&b).ok())
         .and_then(|v| v.get("ok").and_then(|o| o.as_bool()))
         .unwrap_or(false);
+    let token_present = conn.as_ref().map(|c| !c.token.is_empty()).unwrap_or(false)
+        || read_token().is_some();
     serde_json::json!({
-        "url": daemon_url(),
+        "url": url,
         "reachable": health,
-        "token_present": read_token().is_some(),
+        "token_present": token_present,
+        "paired": conn.is_some(),
     })
+}
+
+// ---------- device connect (UI panel backend) ----------
+
+/// Connection config for the paired Linux device, persisted at
+/// ~/.config/muse-daemon/connection.json (0600). Used by daemon_call too
+/// via daemon_url().
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Connection {
+    pub url: String,
+    #[serde(default)]
+    pub token: String,
+    #[serde(default)]
+    pub label: String,
+}
+
+pub fn connection_path() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    std::path::Path::new(&home).join(".config/muse-daemon/connection.json")
+}
+
+fn load_connection() -> Option<Connection> {
+    let raw = std::fs::read_to_string(connection_path()).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+fn save_connection(conn: &Connection) -> Result<(), String> {
+    if !conn.url.starts_with("http://") && !conn.url.starts_with("https://") {
+        return Err("url must start with http:// or https://".into());
+    }
+    if conn.token.is_empty() {
+        return Err("token is required (paste it from the target device)".into());
+    }
+    let p = connection_path();
+    if let Some(dir) = p.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&p, serde_json::to_string_pretty(conn).unwrap()).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
+}
+
+/// Probe a device without saving: GET /health, then GET /tools with the token.
+#[tauri::command]
+pub fn daemon_probe(url: String, token: String) -> Value {
+    let ok_health = http_post(&url, "/health", "", None).is_ok();
+    let tools = http_post(&url, "/tools", "", Some(&token)).ok();
+    let tool_count = tools
+        .as_deref()
+        .and_then(|b| serde_json::from_str::<Value>(b).ok())
+        .and_then(|v| v.get("tools").and_then(|t| t.as_array().map(|a| a.len())))
+        .unwrap_or(0);
+    serde_json::json!({
+        "reachable": ok_health,
+        "authorized": tool_count > 0,
+        "tools": tool_count,
+        "error": if ok_health && tool_count == 0 { Some("connected but token rejected".to_string()) } else { None },
+    })
+}
+
+/// Save (pair) a device connection and verify it in one step.
+#[tauri::command]
+pub fn daemon_connect(url: String, token: String, label: String) -> Result<Value, String> {
+    let conn = Connection { url: url.trim().trim_end_matches('/').to_string(), token: token.trim().to_string(), label };
+    let probe = daemon_probe(conn.url.clone(), conn.token.clone());
+    if !probe["authorized"].as_bool().unwrap_or(false) {
+        return Err(probe["error"]
+            .as_str()
+            .unwrap_or("device unreachable — check the URL (e.g. http://100.x.y.z:7300) and that muse-daemon is running")
+            .to_string());
+    }
+    save_connection(&conn)?;
+    Ok(probe)
+}
+
+/// Forget the paired device.
+#[tauri::command]
+pub fn daemon_disconnect() -> Result<(), String> {
+    let p = connection_path();
+    if p.exists() {
+        std::fs::remove_file(&p).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Current paired device (token redacted) for the UI.
+#[tauri::command]
+pub fn daemon_get_connection() -> Value {
+    match load_connection() {
+        Some(c) => serde_json::json!({
+            "paired": true,
+            "url": c.url,
+            "label": c.label,
+            "token_preview": format!("…{}", &c.token[c.token.len().saturating_sub(4)..]),
+        }),
+        None => serde_json::json!({"paired": false}),
+    }
+}
+
+/// Make daemon_call use the saved connection if present (fallback to env/def).
+pub fn effective_url() -> String {
+    load_connection().map(|c| c.url).unwrap_or_else(daemon_url)
 }
 
 #[cfg(test)]
