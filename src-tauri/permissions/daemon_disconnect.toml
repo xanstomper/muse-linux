@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-daemon-disconnect"
+description = "Allows daemon_disconnect"
+commands.allow = ["daemon_disconnect"]

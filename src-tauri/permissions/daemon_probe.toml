@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-daemon-probe"
+description = "Allows daemon_probe"
+commands.allow = ["daemon_probe"]

@@ -387,6 +387,48 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Allows daemon_connect",
+          "type": "string",
+          "const": "allow-daemon-connect",
+          "markdownDescription": "Allows daemon_connect"
+        },
+        {
+          "description": "Allows daemon_disconnect",
+          "type": "string",
+          "const": "allow-daemon-disconnect",
+          "markdownDescription": "Allows daemon_disconnect"
+        },
+        {
+          "description": "Allows daemon_get_connection",
+          "type": "string",
+          "const": "allow-daemon-get-connection",
+          "markdownDescription": "Allows daemon_get_connection"
+        },
+        {
+          "description": "Allows daemon_pair_poll",
+          "type": "string",
+          "const": "allow-daemon-pair-poll",
+          "markdownDescription": "Allows daemon_pair_poll"
+        },
+        {
+          "description": "Allows daemon_pair_start",
+          "type": "string",
+          "const": "allow-daemon-pair-start",
+          "markdownDescription": "Allows daemon_pair_start"
+        },
+        {
+          "description": "Allows daemon_probe",
+          "type": "string",
+          "const": "allow-daemon-probe",
+          "markdownDescription": "Allows daemon_probe"
+        },
+        {
+          "description": "Allows daemon_status",
+          "type": "string",
+          "const": "allow-daemon-status",
+          "markdownDescription": "Allows daemon_status"
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",

@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-daemon-pair-start"
+description = "Allows daemon_pair_start"
+commands.allow = ["daemon_pair_start"]

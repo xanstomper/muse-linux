@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-daemon-get-connection"
+description = "Allows daemon_get_connection"
+commands.allow = ["daemon_get_connection"]

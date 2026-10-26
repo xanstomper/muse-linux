@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-daemon-pair-poll"
+description = "Allows daemon_pair_poll"
+commands.allow = ["daemon_pair_poll"]

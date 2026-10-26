@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-daemon-status"
+description = "Allows daemon_status"
+commands.allow = ["daemon_status"]

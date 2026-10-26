@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-daemon-connect"
+description = "Allows daemon_connect"
+commands.allow = ["daemon_connect"]
