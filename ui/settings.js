@@ -246,14 +246,17 @@
       if (!document.body) return;
       // muse.ai uses [role=menu]/[data-slot=popover-content]/div overlays
       const menus = document.querySelectorAll(
-        '[role="menu"], [data-slot="popover-content"], [data-radix-popper-content-wrapper]'
+        '[role="menu"], [role="dialog"], [data-slot="popover-content"], [data-radix-popper-content-wrapper]'
       );
       menus.forEach((menu) => {
         if (menu.querySelector("#mus-menu-item") || menu.dataset.musWired) return;
-        const items = [...menu.querySelectorAll('[role^="menuitem"], button, a')];
+        const items = [...menu.querySelectorAll('[role^="menuitem"], button, a, [data-radix-collection-item]')];
         const anchor = items.find((el) => {
+          if (el.id === "mus-menu-item") return false;
           const t = (el.textContent || el.getAttribute("aria-label") || "").trim().toLowerCase();
-          return (t === "settings" || t === "preferences") && !/mobile|desktop|download|app/i.test(t);
+          if (/mobile|download|app\b|desktop settings|linux settings/.test(t)) return false;
+          return t === "settings" || t === "preferences" ||
+                 (t.length < 40 && /^[\s·•]*settings\b/.test(t));
         });
         if (!anchor) return;
         menu.dataset.musWired = "1";
