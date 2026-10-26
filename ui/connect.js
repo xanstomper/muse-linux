@@ -268,7 +268,7 @@
       const msg = String(e);
       setStatus(
         msg.includes("refused") || msg.includes("timed out")
-          ? `No daemon at ${base}. On the device run: curl -fsSL https://raw.githubusercontent.com/xanstomper/muse-linux/main/install.sh | bash`
+          ? `No daemon at ${base}. On the device run: curl -fsSL https://raw.githubusercontent.com/xanstomper/muse-linux/master/install.sh | bash`
           : msg,
         "err"
       );
