@@ -72,6 +72,7 @@ WantedBy=default.target
 EOF
 systemctl --user daemon-reload
 systemctl --user enable --now muse-daemon
+systemctl --user restart muse-daemon
 
 echo "[muse] done. Daemon listening on 0.0.0.0:7300."
 echo "[muse] Pair from the Muse desktop app: Connect Device."
