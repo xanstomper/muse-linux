@@ -34,7 +34,8 @@ pub struct DaemonReply {
     pub error: Option<Value>,
 }
 
-/// POST JSON, return response body (no TLS — bind is Tailscale-only).
+/// HTTP request helper. Empty body ⇒ GET, otherwise POST JSON.
+/// (No TLS — bind is Tailscale-encrypted.)
 fn http_post(url: &str, path: &str, body: &str, token: Option<&str>) -> Result<String, String> {
     let rest = url
         .strip_prefix("http://")
@@ -46,12 +47,14 @@ fn http_post(url: &str, path: &str, body: &str, token: Option<&str>) -> Result<S
         .set_read_timeout(Some(Duration::from_secs(90)))
         .map_err(|e| e.to_string())?;
     let auth = token
-        .map(|t| format!("Authorization: Bearer {t}"))
+        .map(|t| format!("Authorization: Bearer {t}\r\n"))
         .unwrap_or_default();
-    let req = format!(
-        "POST {path} HTTP/1.1\r\nHost: {hostport}\r\nContent-Type: application/json\r\n{auth}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
-    );
+    let method = if body.is_empty() { "GET" } else { "POST" };
+    let req = if body.is_empty() {
+        format!("{method} {path} HTTP/1.1\r\nHost: {hostport}\r\n{auth}Content-Length: 0\r\nConnection: close\r\n\r\n")
+    } else {
+        format!("{method} {path} HTTP/1.1\r\nHost: {hostport}\r\nContent-Type: application/json\r\n{auth}Content-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len())
+    };
     stream
         .write_all(req.as_bytes())
         .map_err(|e| format!("daemon write: {e}"))?;
@@ -225,6 +228,29 @@ pub fn daemon_get_connection() -> Value {
         }),
         None => serde_json::json!({"paired": false}),
     }
+}
+
+/// One-step pairing from the app side:
+///  1. POST nothing — GET {base}/pair/start → {code}
+///  2. poll GET {base}/pair/poll?code=NN until approved (daemon hands the token once)
+///  3. save the connection and verify it
+/// The user approves ON the device with `muse pair <code>` — physical trust.
+#[tauri::command]
+pub fn daemon_pair_start(base: String) -> Result<Value, String> {
+    let url = base.trim().trim_end_matches('/').to_string();
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("device address must start with http:// or https://".into());
+    }
+    // reuse http_post (it works for GET-ish empty bodies; daemon routes GET /pair/start)
+    let resp = http_post(&url, "/pair/start", "", None)?;
+    serde_json::from_str::<Value>(&resp).map_err(|e| format!("pair/start reply: {e}"))
+}
+
+#[tauri::command]
+pub fn daemon_pair_poll(base: String, code: String) -> Result<Value, String> {
+    let url = base.trim().trim_end_matches('/').to_string();
+    let resp = http_post(&url, &format!("/pair/poll?code={}", code.trim()), "", None)?;
+    serde_json::from_str::<Value>(&resp).map_err(|e| format!("pair/poll reply: {e}"))
 }
 
 /// Make daemon_call use the saved connection if present (fallback to env/def).

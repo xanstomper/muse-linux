@@ -89,5 +89,46 @@
   window.addEventListener("online", onlineAgain);
   if (navigator.onLine === false) offlineScreen();
 
-  console.info("[MuseLinux] desktop UX layer ready (zoom/find/links/offline)");
+  // Tag body with the current path so login-scoped CSS rules can match
+  // (e.g. hide the marketing hero only on /login, never the chat composer).
+  function tagPath() {
+    try { document.body?.setAttribute("data-path", location.pathname); } catch {}
+  }
+  tagPath();
+  window.addEventListener("popstate", tagPath);
+  const _push = history.pushState?.bind(history);
+  if (_push) history.pushState = (...a) => { _push(...a); tagPath(); };
+
+  // n8: app keyboard shortcuts (native menubar removed — clean top edge).
+  // Zoom, new chat, find, connect-device — all via JS now.
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (e.ctrlKey && e.shiftKey && k === "d") {
+        e.preventDefault();
+        window.__museConnect?.open?.();
+      } else if (mod && !e.shiftKey && k === "l") {
+        e.preventDefault();
+        desktop.newChat();
+      } else if (mod && !e.shiftKey && (k === "=" || k === "+")) {
+        e.preventDefault();
+        desktop.zoom(0.1);
+      } else if (mod && !e.shiftKey && k === "-") {
+        e.preventDefault();
+        desktop.zoom(-0.1);
+      } else if (mod && !e.shiftKey && k === "0") {
+        e.preventDefault();
+        desktop.zoom(null);
+      } else if (mod && !e.shiftKey && k === "f") {
+        e.preventDefault();
+        desktop.find();
+      }
+    },
+    true
+  );
+
+  console.info("[MuseLinux] desktop UX layer ready (zoom/find/links/offline/path-tag/shortcuts)");
 })();

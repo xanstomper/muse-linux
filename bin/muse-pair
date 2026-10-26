@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# muse pair <code> — approve a device-pairing request ON this machine.
+# The Muse desktop app shows a 6-digit code; running this locally approves it.
+# Localhost-only by design: only someone with shell access here can approve.
+set -euo pipefail
+PORT="${MUSE_DAEMON_PORT:-7300}"
+CODE="${1:-}"
+if [[ -z "$CODE" ]]; then
+  # no code given: show the pending one (if the app already requested pairing)
+  PENDING=$(curl -sf -m 3 "http://127.0.0.1:${PORT}/pair/start" 2>/dev/null | grep -o '"code":"[0-9]*"' | grep -o '[0-9]*' || true)
+  echo "usage: muse pair <code>   (code is shown in the Muse app)"
+  [[ -n "$PENDING" ]] && echo "pending pairing code on this device: $PENDING"
+  exit 1
+fi
+RESP=$(curl -sf -m 5 -X POST -d "{\"code\":\"${CODE}\"}" "http://127.0.0.1:${PORT}/pair/approve" 2>&1) || {
+  echo "✗ approval failed — is muse-daemon running? (systemctl --user start muse-daemon)" >&2
+  exit 1
+}
+if [[ "$RESP" == *'"approved":true'* ]]; then
+  echo "✓ approved — Muse is now paired with this device."
+else
+  echo "✗ invalid or expired code." >&2
+  exit 1
+fi

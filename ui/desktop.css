@@ -25,8 +25,12 @@ input, textarea, [contenteditable] { -webkit-user-select: text !important; user-
 }
 
 /* n1: hide the landing hero when already logged in — muse.ai shows a full
-   marketing page behind the login form inside the webview. */
-form ~ article, form ~ section { display: none !important; }
+   marketing page behind the login form inside the webview.
+   IMPORTANT: only on the login page (/login). On the app page this rule used
+   to hide the chat composer (it's a <section> sibling of a <form> in the
+   muse.ai DOM) — the "chat box doesn't work" bug. */
+body[data-path^="/login"] form ~ article,
+body[data-path^="/login"] form ~ section { display: none !important; }
 
 /* Focus rings: WebKitGTK's default is invisible; make focus obvious. */
 :focus-visible { outline: 2px solid #0082fb !important; outline-offset: 1px; }

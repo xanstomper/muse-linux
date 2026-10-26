@@ -123,39 +123,10 @@ fn run() {
                 .build(app)?;
             let _ = tray;
 
-            // Native Edit/View menus: clipboard + zoom + find (n4/n5)
-            use tauri::menu::{CheckMenuItem, PredefinedMenuItem, Submenu};
+            // n9: native menubar removed (File/Edit/View clashed with the dark UI).
+            // Shortcuts live in ui/desktop.js: Ctrl+L new chat, Ctrl+Shift+D connect,
+            // Ctrl+=/-/0 zoom, Ctrl+F find, Ctrl+R reload (browser default).
             let window = app.get_webview_window("main").expect("main window");
-
-            let file_menu = Submenu::with_id(app, "file", "File", true)?;
-            file_menu.append(&MenuItem::with_id(app, "new_chat", "New Chat\tCtrl+L", true, None::<&str>)?)?;
-            file_menu.append(&MenuItem::with_id(app, "connect_device", "Connect Device…\tCtrl+Shift+D", true, None::<&str>)?)?;
-            file_menu.append(&PredefinedMenuItem::separator(app)?)?;
-            file_menu.append(&MenuItem::with_id(app, "quit2", "Quit\tCtrl+Q", true, None::<&str>)?)?;
-
-            let edit_menu = Submenu::with_id(app, "edit", "Edit", true)?;
-            edit_menu.append(&PredefinedMenuItem::undo(app, None)?)?;
-            edit_menu.append(&PredefinedMenuItem::redo(app, None)?)?;
-            edit_menu.append(&PredefinedMenuItem::separator(app)?)?;
-            edit_menu.append(&PredefinedMenuItem::cut(app, None)?)?;
-            edit_menu.append(&PredefinedMenuItem::copy(app, None)?)?;
-            edit_menu.append(&PredefinedMenuItem::paste(app, None)?)?;
-            edit_menu.append(&PredefinedMenuItem::select_all(app, None)?)?;
-            edit_menu.append(&PredefinedMenuItem::separator(app)?)?;
-            edit_menu.append(&MenuItem::with_id(app, "find", "Find\tCtrl+F", true, None::<&str>)?)?;
-
-            let view_menu = Submenu::with_id(app, "view", "View", true)?;
-            view_menu.append(&MenuItem::with_id(app, "zoom_in", "Zoom In\tCtrl+=", true, None::<&str>)?)?;
-            view_menu.append(&MenuItem::with_id(app, "zoom_out", "Zoom Out\tCtrl+-", true, None::<&str>)?)?;
-            view_menu.append(&MenuItem::with_id(app, "zoom_reset", "Actual Size\tCtrl+0", true, None::<&str>)?)?;
-            view_menu.append(&PredefinedMenuItem::separator(app)?)?;
-            view_menu.append(&MenuItem::with_id(app, "reload", "Reload	Ctrl+R", true, None::<&str>)?)?;
-
-            let menubar = Menu::new(app)?;
-            menubar.append(&file_menu)?;
-            menubar.append(&edit_menu)?;
-            menubar.append(&view_menu)?;
-            window.set_menu(menubar)?;
 
             // n6: restore persisted window state
             let state_path = window_state_path(app.handle());
@@ -192,35 +163,6 @@ fn run() {
                 }
             });
 
-            app.on_menu_event(move |app_handle, event| {
-                let Some(w) = app_handle.get_webview_window("main") else { return };
-                match event.id().as_ref() {
-                    "new_chat" => {
-                        let _ = w.eval("window.__museDesktop?.newChat?.() || location.reload()");
-                    }
-                    "connect_device" => {
-                        let _ = w.eval("window.__museConnect?.open?.()");
-                    }
-                    "quit2" => app_handle.exit(0),
-                    "find" => {
-                        let _ = w.eval("window.__museDesktop?.find?.()");
-                    }
-                    "zoom_in" => {
-                        let _ = w.eval("window.__museDesktop?.zoom(0.1)");
-                    }
-                    "zoom_out" => {
-                        let _ = w.eval("window.__museDesktop?.zoom(-0.1)");
-                    }
-                    "zoom_reset" => {
-                        let _ = w.eval("window.__museDesktop?.zoom(null)");
-                    }
-                    "reload" => {
-                        let _ = w.eval("location.reload()");
-                    }
-                    _ => {}
-                }
-            });
-
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -246,6 +188,8 @@ fn run() {
             daemon::daemon_connect,
             daemon::daemon_disconnect,
             daemon::daemon_get_connection,
+            daemon::daemon_pair_start,
+            daemon::daemon_pair_poll,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

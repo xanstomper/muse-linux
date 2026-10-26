@@ -5,6 +5,7 @@
 // Transport: HTTP/JSON bound to the Tailscale IP only (config/policy.json),
 // token-authenticated. Tool protocol per docs/guide section 5.
 
+mod pairing;
 mod policy;
 mod tools;
 
@@ -141,8 +142,14 @@ fn write_response(stream: &mut TcpStream, code: &str, body: &str) {
     let _ = stream.flush();
 }
 
+/// Extract ?code= from a /pair/poll?code=NNNNNN path (best-effort).
+fn path_split_code(path: &str) -> Option<String> {
+    path.split("code=").nth(1).map(|c| c.split('&').next().unwrap_or("").to_string())
+}
+
 pub fn run() -> Result<(), String> {
     let pol = Policy::load().map_err(|e| format!("policy: {e}"))?;
+    let pairing_state = std::sync::Arc::new(pairing::PairingState::new());
     let bind = pol.transport_bind();
     let token = std::env::var("MUSE_DAEMON_TOKEN").unwrap_or_else(|_| {
         // stable per-install token at ~/.config/muse-daemon/token (0600);
@@ -193,10 +200,18 @@ pub fn run() -> Result<(), String> {
         let token = Arc::clone(&token);
         let approver = Arc::clone(&approver);
         let registry = registry.clone();
+        let pairing_state = std::sync::Arc::clone(&pairing_state);
         std::thread::spawn(move || {
             let Some((method, path, auth_header, body)) = read_request(&mut stream) else { return; };
-            // auth: every request except /health needs the bearer token
-            if path != "/health" {
+            // auth: everything except /health and the pairing handshake needs
+            // the bearer token (pairing is how you GET a token)
+            // routing ignores query strings
+            let route_path = path.split('?').next().unwrap_or("").to_string();
+            let unauthed_route = path == "/health"
+                || path.starts_with("/pair/start")
+                || path.starts_with("/pair/poll")
+                || path.starts_with("/pair/approve");
+            if !unauthed_route {
                 let header_ok = auth_header.as_deref().map(|t| t == token.as_str()).unwrap_or(false);
                 let authed = header_ok || body.contains(token.as_str()); // body fallback for curl ease
                 if !authed {
@@ -204,12 +219,55 @@ pub fn run() -> Result<(), String> {
                     return;
                 }
             }
-            match (method.as_str(), path.as_str()) {
+            match (method.as_str(), route_path.as_str()) {
                 ("GET", "/health") => write_response(&mut stream, "200 OK", r#"{"ok":true}"#),
                 ("GET", "/tools") => write_response(&mut stream, "200 OK", &registry.to_string()),
                 ("POST", "/call") => {
                     let out = handle_call(&pol, approver.as_ref(), &body);
                     write_response(&mut stream, "200 OK", &out);
+                }
+                // ---- one-step pairing (see pairing.rs) ----
+                // App asks for a code; the user approves on the device itself.
+                ("GET", "/pair/start") => {
+                    let code = pairing_state.start();
+                    policy::audit(&pol, "pair.start", &serde_json::json!({}), "ok", None);
+                    eprintln!("[muse-daemon] PAIRING CODE: {code} — approve with: muse pair {code}");
+                    write_response(&mut stream, "200 OK", &serde_json::json!({"code": code}).to_string());
+                }
+                // Approval is LOCAL-ONLY: must come from the device itself.
+                ("POST", "/pair/approve") => {
+                    let peer = stream.peer_addr().map(|a| a.ip().to_string()).unwrap_or_default();
+                    let is_local = matches!(peer.as_str(), "127.0.0.1" | "::1" | "::ffff:127.0.0.1");
+                    if !is_local {
+                        policy::audit(&pol, "pair.approve", &serde_json::json!({"peer": peer}), "denied", Some("remote approval not allowed"));
+                        write_response(&mut stream, "403 Forbidden", r#"{"error":"approve on the device itself (localhost)"}"#);
+                        return;
+                    }
+                    let code = serde_json::from_str::<Value>(&body)
+                        .ok()
+                        .and_then(|v| v.get("code").and_then(|c| c.as_str()).map(String::from))
+                        .unwrap_or_default();
+                    let ok = pairing_state.approve(&code);
+                    policy::audit(&pol, "pair.approve", &serde_json::json!({"result": ok}), if ok {"ok"} else {"invalid"}, None);
+                    if ok {
+                        write_response(&mut stream, "200 OK", r#"{"approved":true}"#);
+                    } else {
+                        write_response(&mut stream, "400 Bad Request", r#"{"error":"invalid or expired code"}"#);
+                    }
+                }
+                // App polls with the code it displayed; on approval gets the token ONCE.
+                ("GET", "/pair/poll") => {
+                    // the poller must present the code it received from /pair/start;
+                    // approval handoff is one-shot
+                    let qcode = path_split_code(&path).unwrap_or_default();
+                    let matches = pairing_state.pending().as_deref() == Some(qcode.as_str());
+                    let approved = matches && pairing_state.take_approved();
+                    if approved {
+                        policy::audit(&pol, "pair.complete", &serde_json::json!({}), "ok", None);
+                        write_response(&mut stream, "200 OK", &serde_json::json!({"token": token.as_str()}).to_string());
+                    } else {
+                        write_response(&mut stream, "200 OK", r#"{"pending":true}"#);
+                    }
                 }
                 _ => write_response(&mut stream, "404 Not Found", r#"{"error":"no route"}"#),
             }
