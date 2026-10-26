@@ -1,1 +1,1 @@
-{}
+{"main-local":{"identifier":"main-local","description":"","local":true,"windows":["*"],"permissions":["core:default"]},"remote-muse":{"identifier":"remote-muse","description":"","remote":{"urls":["https://muse.ai/*","https://*.muse.ai/*"]},"local":true,"windows":["*"],"permissions":["core:default","core:event:default","shell:allow-open"]}}
