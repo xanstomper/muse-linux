@@ -179,6 +179,7 @@ fn run() {
             tools::notify,
             tools::push_to_muse,
             tools::set_yolo,
+            tools::set_notify_enabled,
             tools::audit_tail,
             agent::term_exec,
             agent::term_reset,

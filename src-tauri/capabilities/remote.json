@@ -23,6 +23,7 @@
     "allow-daemon-status",
     "allow-daemon-get-connection",
     "allow-set-yolo",
-    "allow-audit-tail"
+    "allow-audit-tail",
+    "allow-set-notify-enabled"
   ]
 }

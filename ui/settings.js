@@ -72,12 +72,6 @@
   color: #9fe8b9; max-height: 160px; overflow-y: auto; white-space: pre-wrap;
   -webkit-user-select: text; user-select: text; }
 .mus-audit.show { display: block; }
-#mus-gearbtn { position: fixed; right: 12px; bottom: 12px; z-index: 999995;
-  width: 34px; height: 34px; border-radius: 10px; border: 1px solid rgba(255,255,255,.09);
-  background: rgba(22,25,33,.85); backdrop-filter: blur(8px); color: #8b93a5;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 18px rgba(0,0,0,.4); }
-#mus-gearbtn:hover { color: #e9ecf3; border-color: rgba(0,130,251,.45); }
 `;
 
   let els = null;
@@ -121,12 +115,24 @@
           <div class="mus-section">
             <div class="mus-sec-title">${I.type} Linux</div>
             <div class="mus-row">
-              <div><div class="l">Native input method</div><div class="d">Simple IM module is active — typing works reliably in the composer and dialogs.</div></div>
+              <div><div class="l">Native input method</div><div class="d">Simple IM module (ibus bypass) — typing works reliably in composer and dialogs.</div></div>
               <span class="mus-devstat" style="color:#3ecf6f">${I.check} on</span>
             </div>
             <div class="mus-row">
-              <div><div class="l">Hardware acceleration</div><div class="d">Disabled for WebKitGTK stability — prevents blank screens on NVIDIA/DMABUF systems.</div></div>
+              <div><div class="l">Hardware acceleration</div><div class="d">WebKitGTK compositing/DMABUF disabled — prevents blank screens on NVIDIA systems.</div></div>
               <span class="mus-devstat" style="color:#8b93a5">off</span>
+            </div>
+            <div class="mus-row">
+              <div><div class="l">System notifications</div><div class="d">Desktop notifications via the portal daemon (libnotify).</div></div>
+              <div class="mus-toggle" id="mus-notify-tgl"></div>
+            </div>
+            <div class="mus-row">
+              <div><div class="l">Keep in system tray</div><div class="d">Closing the window keeps Muse running in the tray. Disable to quit fully on close.</div></div>
+              <div class="mus-toggle on" id="mus-tray-tgl"></div>
+            </div>
+            <div class="mus-row">
+              <div><div class="l">Keyboard shortcuts</div><div class="d">Ctrl+L new chat · Ctrl+F find · Ctrl+, settings · Ctrl+scroll zoom · Ctrl+Shift+D connect device</div></div>
+              <span class="mus-devstat" style="color:#8b93a5">—</span>
             </div>
           </div>
           <div class="mus-section">
@@ -148,12 +154,6 @@
     style.textContent = CSS;
     (document.head || document.documentElement).appendChild(style);
 
-    const gear = document.createElement("button");
-    gear.id = "mus-gearbtn";
-    gear.title = "Settings (Ctrl+,)";
-    gear.innerHTML = I.gear;
-    gear.addEventListener("click", open);
-    (document.documentElement || document.body).appendChild(gear);
 
     root.addEventListener("click", (e) => { if (e.target === root) close(); });
     root.querySelector(".mus-close").addEventListener("click", close);
@@ -173,6 +173,21 @@
     root.querySelector("#mus-zout").addEventListener("click", () => zoomStep(-0.1));
     els.yolo.addEventListener("click", toggleYolo);
     root.querySelector("#mus-auditbtn").addEventListener("click", toggleAudit);
+    const nt = root.querySelector("#mus-notify-tgl");
+    nt.classList.toggle("on", localStorage.getItem("mus-notify") !== "0");
+    nt.addEventListener("click", () => {
+      const on = !nt.classList.contains("on");
+      nt.classList.toggle("on", on);
+      localStorage.setItem("mus-notify", on ? "1" : "0");
+      try { invoke("set_notify_enabled", { on }); } catch {}
+    });
+    const tt = root.querySelector("#mus-tray-tgl");
+    tt.classList.toggle("on", localStorage.getItem("mus-tray") !== "0");
+    tt.addEventListener("click", () => {
+      const on = !tt.classList.contains("on");
+      tt.classList.toggle("on", on);
+      localStorage.setItem("mus-tray", on ? "1" : "0");
+    });
   }
 
   function zoomStep(d) {
@@ -236,19 +251,22 @@
       menus.forEach((menu) => {
         if (menu.querySelector("#mus-menu-item") || menu.dataset.musWired) return;
         const items = [...menu.querySelectorAll('[role^="menuitem"], button, a')];
-        const anchor = items.find((el) =>
-          /settings|preferences/i.test(el.textContent || el.getAttribute("aria-label") || ""));
+        const anchor = items.find((el) => {
+          const t = (el.textContent || el.getAttribute("aria-label") || "").trim().toLowerCase();
+          return (t === "settings" || t === "preferences") && !/mobile|desktop|download|app/i.test(t);
+        });
         if (!anchor) return;
         menu.dataset.musWired = "1";
         const row = anchor.cloneNode(true);
         row.id = "mus-menu-item";
         row.removeAttribute("href");
-        row.setAttribute("aria-label", "Muse Desktop settings");
-        // swap label text
-        const label = row.querySelector("span:not(:has(svg))") || row;
-        const txtNode = [...row.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
-        if (txtNode) txtNode.textContent = "Muse Desktop settings";
-        else if (label && label.textContent.trim()) label.textContent = "Muse Desktop settings";
+        row.setAttribute("aria-label", "Linux settings");
+        row.setAttribute("data-pel-click", "linux_settings_click");
+        // wipe every text node inside the clone, then set one clean label
+        const walk = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+        while (walk.nextNode()) walk.currentNode.textContent = "";
+        const first = row.querySelector("span,div,p") || row;
+        first.textContent = "Linux settings";
         row.addEventListener("click", (e) => {
           e.preventDefault(); e.stopPropagation();
           open();
@@ -268,5 +286,5 @@
   }
 
   window.__museSettings = { open, close, refresh };
-  console.info("[MuseLinux] settings panel ready (Ctrl+, gear, and baked into muse.ai settings menu)");
+  console.info("[MuseLinux] settings panel ready (Ctrl+, and baked into muse.ai settings menu)");
 })();

@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-set-notify-enabled"
+description = "Allows set_notify_enabled"
+commands.allow = ["set_notify_enabled"]

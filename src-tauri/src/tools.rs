@@ -270,6 +270,9 @@ pub fn open_path(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn notify(title: String, body: String) -> Result<(), String> {
+    if !NOTIFY_ENABLED.load(Ordering::Relaxed) {
+        return Ok(());
+    }
     notify_rust::Notification::new()
         .summary(&title)
         .body(&body)
@@ -295,6 +298,18 @@ pub fn push_to_muse(app: tauri::AppHandle, text: String) -> Result<String, Strin
     } else {
         Ok("clipboard-only".into())
     }
+}
+
+static NOTIFY_ENABLED: AtomicBool = AtomicBool::new(true);
+
+#[tauri::command]
+pub fn set_notify_enabled(on: bool) -> Result<(), String> {
+    NOTIFY_ENABLED.store(on, Ordering::Relaxed);
+    let _ = fs::write(
+        audit_dir().join("notify-enabled"),
+        if on { "1" } else { "0" },
+    );
+    Ok(())
 }
 
 #[tauri::command]

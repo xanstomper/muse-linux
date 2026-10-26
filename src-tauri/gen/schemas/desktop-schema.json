@@ -435,6 +435,12 @@
           "markdownDescription": "Allows daemon_status"
         },
         {
+          "description": "Allows set_notify_enabled",
+          "type": "string",
+          "const": "allow-set-notify-enabled",
+          "markdownDescription": "Allows set_notify_enabled"
+        },
+        {
           "description": "Allows set_yolo",
           "type": "string",
           "const": "allow-set-yolo",
