@@ -30,6 +30,10 @@ fi
 mkdir -p "$INSTALL_DIR"
 cp "$BIN" "$INSTALL_DIR/muse-daemon"
 chmod +x "$INSTALL_DIR/muse-daemon"
+# pairing helper: `muse pair <code>` approves from the device itself
+mkdir -p "$HOME/.local/bin"
+curl -fsSL "$REPO/raw/master/bin/muse-pair" -o "$HOME/.local/bin/muse-pair" || true
+chmod +x "$HOME/.local/bin/muse-pair" 2>/dev/null || true
 
 # 2. Default policy (localhost tools, tailscale-only transport) if none exists
 POLICY_PATH="$HOME/.config/muse-daemon/policy.json"
