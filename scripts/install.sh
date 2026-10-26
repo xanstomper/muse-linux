@@ -28,6 +28,9 @@ else
 fi
 
 mkdir -p "$INSTALL_DIR"
+systemctl --user stop muse-daemon 2>/dev/null || true
+pkill -f muse-daemon 2>/dev/null || true
+sleep 0.5
 cp "$BIN" "$INSTALL_DIR/muse-daemon"
 chmod +x "$INSTALL_DIR/muse-daemon"
 # pairing helper: `muse pair <code>` approves from the device itself
