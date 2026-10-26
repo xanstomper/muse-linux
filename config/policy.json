@@ -1,0 +1,62 @@
+{
+  "capabilities": {
+    "files": "read",
+    "terminal": "ask",
+    "windows": "read",
+    "browser": "off",
+    "screen": "ask",
+    "camera": "off",
+    "notifications": "auto",
+    "system": "read",
+    "clipboard": "read"
+  },
+  "allowed_folders": [
+    "/home/jewboy420/muse-linux",
+    "/home/jewboy420/Documents",
+    "/home/jewboy420/Downloads",
+    "/home/jewboy420/Desktop"
+  ],
+  "blocked_folders": [
+    "/home/jewboy420/.ssh",
+    "/home/jewboy420/.gnupg",
+    "/home/jewboy420/.password-store",
+    "/home/jewboy420/.config/BraveSoftware"
+  ],
+  "blocked_apps": [
+    "keepassxc",
+    "seahorse"
+  ],
+  "blocked_commands": [
+    "rm -rf /",
+    "rm -rf ~",
+    "mkfs",
+    "dd if=/dev/zero",
+    "shutdown",
+    "reboot",
+    "poweroff",
+    ":(){ :|:&};:",
+    "chmod -R 777 /",
+    "apt remove",
+    "apt purge"
+  ],
+  "require_approval_for": [
+    "files.write",
+    "files.move",
+    "files.trash",
+    "shell.exec",
+    "windows.click",
+    "windows.type",
+    "windows.key",
+    "browser.click",
+    "browser.type",
+    "camera.snap",
+    "mail.send"
+  ],
+  "transport": {
+    "bind": "100.93.60.2:7300",
+    "token_env": "MUSE_DAEMON_TOKEN"
+  },
+  "audit_log": "/home/jewboy420/.local/share/muse-daemon/audit.log",
+  "max_output_bytes": 262144,
+  "default_timeout_ms": 15000
+}

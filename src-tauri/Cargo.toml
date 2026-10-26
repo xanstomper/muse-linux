@@ -24,6 +24,3 @@ walkdir = "2"
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }
 
-[profile.release]
-strip = true
-lto = true
