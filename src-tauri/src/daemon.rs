@@ -253,7 +253,11 @@ pub fn daemon_pair_start(base: String) -> Result<Value, String> {
     }
     // reuse http_post (it works for GET-ish empty bodies; daemon routes GET /pair/start)
     let resp = http_post(&url, "/pair/start", "", None)?;
-    serde_json::from_str::<Value>(&resp).map_err(|e| format!("pair/start reply: {e}"))
+    let val: Value = serde_json::from_str(&resp).map_err(|e| format!("pair/start reply: {e}"))?;
+    // 1-click: if we (the desktop) are a tailnet peer of the device, auto-approve
+    // instantly — no code, no device commands. Falls back to manual code approval.
+    let _ = http_post(&url, "/pair/auto", "", None);
+    Ok(val)
 }
 
 #[tauri::command]

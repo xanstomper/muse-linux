@@ -57,6 +57,13 @@ impl PairingState {
         }
     }
 
+    /// Auto-approve the pending request unconditionally (tailnet peer = trusted owner).
+    pub fn approve_all_pending(&self) {
+        if let Some(g) = self.inner.lock().unwrap().as_mut() {
+            g.approved = true;
+        }
+    }
+
     /// One-shot handoff for the poller: true only the FIRST time after approval.
     pub fn take_approved(&self) -> bool {
         let mut g = self.inner.lock().unwrap();

@@ -210,7 +210,8 @@ pub fn run() -> Result<(), String> {
             let unauthed_route = path == "/health"
                 || path.starts_with("/pair/start")
                 || path.starts_with("/pair/poll")
-                || path.starts_with("/pair/approve");
+                || path.starts_with("/pair/approve")
+                || path.starts_with("/pair/auto");
             if !unauthed_route {
                 let header_ok = auth_header.as_deref().map(|t| t == token.as_str()).unwrap_or(false);
                 let authed = header_ok || body.contains(token.as_str()); // body fallback for curl ease
@@ -228,6 +229,21 @@ pub fn run() -> Result<(), String> {
                 }
                 // ---- one-step pairing (see pairing.rs) ----
                 // App asks for a code; the user approves on the device itself.
+                // Tailnet auto-approve: Tailscale already authenticated the caller's identity;
+                // any 100.64.0.0/10 (CGNAT) peer is the device owner. 1-click pairing, no commands.
+                ("GET", "/pair/auto") => {
+                    let peer = stream.peer_addr().map(|a| a.ip().to_string()).unwrap_or_default();
+                    let is_tailnet = peer.starts_with("100.")
+                        && !peer.starts_with("100.100."); // outside CGNAT range sanity
+                    if is_tailnet {
+                        pairing_state.approve_all_pending();
+                        policy::audit(&pol, "pair.auto", &serde_json::json!({"peer": peer}), "ok", None);
+                        write_response(&mut stream, "200 OK", r#"{"approved":true,"via":"tailnet"}"#);
+                    } else {
+                        policy::audit(&pol, "pair.auto", &serde_json::json!({"peer": peer}), "denied", Some("not a tailnet peer"));
+                        write_response(&mut stream, "403 Forbidden", r#"{"error":"not a tailnet peer"}"#);
+                    }
+                }
                 ("GET", "/pair/start") => {
                     let code = pairing_state.start();
                     policy::audit(&pol, "pair.start", &serde_json::json!({}), "ok", None);
