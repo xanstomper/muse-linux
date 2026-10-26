@@ -40,9 +40,19 @@ fn http_post(url: &str, path: &str, body: &str, token: Option<&str>) -> Result<S
     let rest = url
         .strip_prefix("http://")
         .ok_or_else(|| "daemon url must be http:// (tailscale transport)".to_string())?;
-    let hostport = rest.split('/').next().unwrap_or(rest);
+    let mut hostport = rest.split('/').next().unwrap_or(rest).to_string();
+    // accept bare host/IP (Tailscale MagicDNS names) — default to the daemon port
+    if !hostport.contains(':') {
+        hostport.push_str(":7300");
+    }
+    use std::net::ToSocketAddrs;
+    let addr = hostport
+        .to_socket_addrs()
+        .map_err(|e| format!("resolve {hostport}: {e}"))?
+        .next()
+        .ok_or_else(|| format!("resolve {hostport}: no addresses"))?;
     let mut stream =
-        std::net::TcpStream::connect(hostport).map_err(|e| format!("daemon connect: {e}"))?;
+        std::net::TcpStream::connect(addr).map_err(|e| format!("daemon connect: {e}"))?;
     stream
         .set_read_timeout(Some(Duration::from_secs(90)))
         .map_err(|e| e.to_string())?;
