@@ -32,8 +32,7 @@ input, textarea, [contenteditable] { -webkit-user-select: text !important; user-
 body[data-path^="/login"] form ~ article,
 body[data-path^="/login"] form ~ section { display: none !important; }
 
-/* Focus rings: WebKitGTK's default is invisible; make focus obvious. */
-:focus-visible { outline: 2px solid #0082fb !important; outline-offset: 1px; }
+/* Focus rings: muse.ai ships its own focus styles — do not override globally. */
 
 /* Kill the double-scrollbar effect inside chat scrollers. */
 ::-webkit-scrollbar { width: 10px; }

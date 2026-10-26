@@ -171,10 +171,10 @@
         </div>
         <div class="muc-foot">${ICONS.shield} Approval happens on your device — Muse never sees the token until you approve.</div>
       </div>`;
-    document.body.appendChild(root);
+    (document.body || document.documentElement).appendChild(root);
     const style = document.createElement("style");
     style.textContent = CSS;
-    document.head.appendChild(style);
+    (document.head || document.documentElement).appendChild(style);
 
     root.addEventListener("click", (e) => { if (e.target === root) close(); });
     els = {
@@ -338,6 +338,13 @@
   }
 
   async function updateBadge() {
+    try {
+      await updateBadgeInner();
+    } catch (e) {
+      /* never let the connect UI break the host page */
+    }
+  }
+  async function updateBadgeInner() {
     ensureDom();
     let badge = document.getElementById("muse-dev-badge");
     if (!badge) {
@@ -345,7 +352,9 @@
       badge.id = "muse-dev-badge";
       badge.className = "muc-badge";
       badge.addEventListener("click", open);
-      document.body.appendChild(badge);
+      // attach OUTSIDE the app's React root (body) so SPA reconciliation never
+      // sees our nodes — this was crashing muse.ai to a white screen
+      (document.documentElement || document.body).appendChild(badge);
     }
     let s = {};
     try { s = await invoke("daemon_status"); } catch {}
@@ -363,11 +372,12 @@
 
   window.__museConnect = { open, close, refresh: updateBadge };
 
+  function kick() { try { updateBadge(); } catch (e) {} }
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", updateBadge);
+    document.addEventListener("DOMContentLoaded", kick);
   } else {
-    updateBadge();
+    kick();
   }
-  setInterval(updateBadge, 15000);
+  setInterval(kick, 15000);
   console.info("[MuseLinux] device connect panel v2 ready (Ctrl+Shift+D or bottom-left chip)");
 })();
