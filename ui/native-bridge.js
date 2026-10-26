@@ -27,6 +27,21 @@
     yolo: (on) => invoke("set_yolo", { on }),
   };
 
+  // companion daemon proxy — policy lives daemon-side; app just forwards.
+  const dcall = (tool, args) => invoke("daemon_call", { tool, arguments: args ?? {} });
+  native.daemon = {
+    status: () => invoke("daemon_status"),
+    call: dcall,
+    // windows.* (phase 3 tools via daemon)
+    windows: {
+      list: () => dcall("windows.list", {}),
+      focus: (id) => dcall("windows.focus", { id }),
+      click: (id, x, y) => dcall("windows.click", { id, x, y }),
+      type: (id, text) => dcall("windows.type", { id, text }),
+      key: (id, key) => dcall("windows.key", { id, key }),
+    },
+  };
+
   window.__museNative = native;
 
   console.info("[MuseLinux] native bridge ready: window.__museNative (exec/term/fs/git/patch/procs)");

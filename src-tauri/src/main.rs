@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![cfg_attr(test, allow(dead_code))]
 
-use muse_linux_lib::{agent, tools};
+use muse_linux_lib::{agent, daemon, tools};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -33,7 +33,10 @@ fn run() {
             let toggle = MenuItem::with_id(app, "toggle", "Show/Hide Muse", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&toggle, &quit])?;
+            // real Meta Muse mark (muse.ai official brand asset)
+            let icon = app.default_window_icon().cloned().expect("bundle icon");
             TrayIconBuilder::new()
+                .icon(icon)
                 .menu(&menu)
                 .tooltip("Muse")
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -70,6 +73,8 @@ fn run() {
             agent::term_reset,
             agent::git_status,
             agent::apply_patch,
+            daemon::daemon_call,
+            daemon::daemon_status,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
